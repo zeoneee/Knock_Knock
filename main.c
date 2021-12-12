@@ -1,5 +1,8 @@
 #include <Keypad.h> 
 #include <Servo.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial Bluetooth(12, 13);
 
 int tru=0; // 비밀번호가 맞는지 확인
 int count=0;
@@ -24,7 +27,12 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
  
 void setup(){ 
   Serial.begin(9600); 
+  Serial.println("Ready..");
+  Bluetooth.begin(9600);
   myservo.attach(11);
+  
+  sendATcommand("AT+NAMEdatafarm","OKsetname",500);
+  sendATcommand("AT+PIN2021","OKsetPIN",500); //되는데 응답을 못받음
 } 
    
 void loop(){ 
@@ -46,10 +54,11 @@ void loop(){
 
       if(key=='#')//초기화버튼
        re();//초기화 함수
+    
 
       if(count==4)//count개수가 비밀번호 개수와 같을 시
       {
-        if(tru==4)
+        if(tru==4) // && check==1
           Open();//성공함수
         else
           Close();//실패함수
@@ -57,12 +66,8 @@ void loop(){
         tru=0;
         count=0;
       }
-      
-      
-     
   } 
 } 
-
 
 void Open()//성공했을시 모터를 돌려주며 성공메세지 보내기
 {
@@ -76,6 +81,7 @@ void Open()//성공했을시 모터를 돌려주며 성공메세지 보내기
 void Close()//실패했을시 모터를 돌려주며 실패메세지 보내기
 {
       myservo.write(0);
+      isopen = 0;
       Serial.println("close the door");                                   
 }
 
@@ -84,4 +90,29 @@ void re()//비밀번호 입력중 #을 입력하면 비밀번호 입력중인 �
         tru=0;
         count=0;
         Serial.println("password reset");  
+}
+
+
+bool sendATcommand(String ATcommand, String expectedReply, unsigned int timeout) {
+  String reply;
+
+  while(Bluetooth.available()) Bluetooth.read(); 
+  
+  Bluetooth.println(ATcommand); // Send AT command
+  Serial.print("\t---> "); Serial.println(ATcommand);
+
+  unsigned long startTime = millis();
+
+  while (1) {
+    if (Bluetooth.available()) {
+      reply = Bluetooth.readString(); break;
+    }
+    
+    if (millis() - startTime > timeout) break; 
+  }
+
+  Serial.print("\t<--- "); Serial.println(reply); 
+  if (reply != expectedReply) return false;
+
+  return true;
 }
